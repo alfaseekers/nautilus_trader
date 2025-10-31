@@ -177,8 +177,8 @@ class PolymarketInstrumentProvider(InstrumentProvider):
 
             for market_info in response["data"]:
                 try:
-                    active = market_info["active"]
-                    if filter_is_active and not active:
+                    closed = market_info["closed"]
+                    if filter_is_active and closed:
                         continue
 
                     condition_id = market_info["condition_id"]
