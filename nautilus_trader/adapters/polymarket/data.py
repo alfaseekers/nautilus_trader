@@ -247,7 +247,7 @@ class PolymarketDataClient(LiveMarketDataClient):
         # Polymarket only supports 500 subscriptions per client
         if (
             self._ws_client_pending_connection is None
-            or len(self._ws_client_pending_connection.asset_subscriptions()) >= 500
+            # or len(self._ws_client_pending_connection.asset_subscriptions()) >= 500
         ):
             self._ws_client_pending_connection = self._create_websocket_client()
             create_connect_task = True
