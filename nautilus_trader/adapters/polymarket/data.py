@@ -28,6 +28,7 @@ from nautilus_trader.adapters.polymarket.common.symbol import get_polymarket_ins
 from nautilus_trader.adapters.polymarket.common.symbol import get_polymarket_token_id
 from nautilus_trader.adapters.polymarket.config import PolymarketDataClientConfig
 from nautilus_trader.adapters.polymarket.providers import PolymarketInstrumentProvider
+from nautilus_trader.adapters.polymarket.schemas.book import PolymarketBookLevel
 from nautilus_trader.adapters.polymarket.schemas.book import PolymarketBookSnapshot
 from nautilus_trader.adapters.polymarket.schemas.book import PolymarketQuote
 from nautilus_trader.adapters.polymarket.schemas.book import PolymarketQuotes
@@ -47,6 +48,7 @@ from nautilus_trader.data.messages import RequestInstruments
 from nautilus_trader.data.messages import RequestQuoteTicks
 from nautilus_trader.data.messages import RequestTradeTicks
 from nautilus_trader.data.messages import SubscribeBars
+from nautilus_trader.data.messages import SubscribeData
 from nautilus_trader.data.messages import SubscribeOrderBook
 from nautilus_trader.data.messages import SubscribeQuoteTicks
 from nautilus_trader.data.messages import SubscribeTradeTicks
@@ -324,6 +326,10 @@ class PolymarketDataClient(LiveMarketDataClient):
                 self._send_all_instruments_to_data_engine()
         except asyncio.CancelledError:
             self._log.debug("Canceled task 'update_instruments'")
+
+    async def _subcribe(self, command: SubscribeData):
+        for instrument_id in self._instrument_provider.get_all():
+            await self._subscribe_asset_book(instrument_id)
 
     async def _subscribe_order_book_deltas(self, command: SubscribeOrderBook) -> None:
         if command.book_type == BookType.L3_MBO:
