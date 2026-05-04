@@ -18,6 +18,9 @@ if [[ "$branch_name" == "develop" ]]; then
 elif [[ "$branch_name" == "nightly" ]]; then
   # Nightly branch: use alpha versioning
   suffix="a$(date +%Y%m%d)"
+elif [[ "$branch_name" == feat/* ]]; then
+  # Fork feature branches: same dev versioning as develop
+  suffix=".dev$(date +%Y%m%d)+${GITHUB_RUN_NUMBER}"
 else
   echo "Not modifying version"
 fi

@@ -21,8 +21,8 @@ echo "---"
 # Skip index.html
 files=$(echo "$files" | grep -v "^index\.html$")
 
-# Clean up dev wheels on the develop branch
-if [[ "$branch_name" == "develop" ]]; then
+# Clean up dev wheels on the develop branch and fork feature branches
+if [[ "$branch_name" == "develop" ]] || [[ "$branch_name" == feat/* ]]; then
   echo "Cleaning up .dev wheels for the develop branch..."
   echo "All files before filtering:"
   echo "$files"

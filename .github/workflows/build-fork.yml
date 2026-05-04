@@ -1,0 +1,125 @@
+name: build-fork
+
+# Builds and publishes wheels for the feat/polymarket-subscribe-all fork branch
+# to the organization's private Cloudflare R2 bucket on every push.
+#
+# Required GitHub repository secrets:
+#   R2_ACCESS_KEY_ID      - R2 access key ID
+#   R2_SECRET_ACCESS_KEY  - R2 secret access key
+#   R2_ACCOUNT_ID         - Cloudflare account ID (used to construct the S3 endpoint)
+#
+# Wheels are published to the PEP 503 simple index at:
+#   https://packages.alfaseekers.com/simple/nautilus-trader/
+#
+# Consuming uv projects add to pyproject.toml:
+#
+#   [[tool.uv.index]]
+#   url = "https://packages.alfaseekers.com/simple"
+#   name = "alfaseekers"
+#   explicit = true
+#
+#   [tool.uv.sources]
+#   nautilus-trader = { index = "alfaseekers" }
+#
+#   [tool.uv]
+#   prerelease = "allow-all"    # wheels carry a .dev pre-release suffix
+#
+# Or pin a specific wheel directly on the command line:
+#   uv add "https://packages.alfaseekers.com/simple/nautilus-trader/<wheel-filename>"
+
+on:
+  push:
+    branches:
+      - feat/polymarket-subscribe-all
+
+jobs:
+  build:
+    name: build - python ${{ matrix.python-version }} (ubuntu-22.04)
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.12"
+          - "3.13"
+    env:
+      BUILD_MODE: release
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target/build-fork
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout repository
+        # https://github.com/actions/checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Common setup
+        uses: ./.github/actions/common-setup
+        with:
+          python-version: ${{ matrix.python-version }}
+          free-disk-space: "true"
+          rust-cache-enabled: "true"
+          rust-cache-key: build-fork
+          rust-cache-workspaces: . -> target/build-fork
+          rust-cache-save-if: "true"
+
+      - name: Build and install wheel
+        uses: ./.github/actions/common-wheel-build
+        with:
+          python-version: ${{ matrix.python-version }}
+          github_ref: ${{ github.ref }}
+
+      - name: Resolve wheel path
+        shell: bash
+        run: |
+          ASSET_PATH=$(find ./dist -name "nautilus_trader-*.whl" -type f | xargs ls -t 2>/dev/null | head -n 1)
+          if [ -z "$ASSET_PATH" ]; then
+            echo "Error: no wheel found in dist/" >&2
+            exit 1
+          fi
+          echo "ASSET_NAME=$(basename "$ASSET_PATH")" >> "$GITHUB_ENV"
+
+      - name: Upload wheel artifact
+        # https://github.com/actions/upload-artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ env.ASSET_NAME }}
+          path: dist/nautilus_trader-*.whl
+
+  publish:
+    name: publish-fork-wheels
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write  # required for deleting artifacts after publish
+      contents: read
+    needs:
+      - build
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      CLOUDFLARE_R2_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      CLOUDFLARE_R2_REGION: "auto"
+      CLOUDFLARE_R2_BUCKET_NAME: "packages"
+    steps:
+      - name: Checkout repository
+        # https://github.com/actions/checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Download built wheels
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: dist
+          pattern: "nautilus_trader-*.whl"
+          merge-multiple: true
+
+      - name: Publish wheels to Cloudflare R2
+        uses: ./.github/actions/publish-wheels
+
+      - name: Fetch and delete artifacts for current run
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash ./scripts/ci/publish-wheels-delete-artifacts.sh
