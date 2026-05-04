@@ -327,7 +327,7 @@ class PolymarketDataClient(LiveMarketDataClient):
         except asyncio.CancelledError:
             self._log.debug("Canceled task 'update_instruments'")
 
-    async def _subcribe(self, command: SubscribeData):
+    async def _subscribe(self, command: SubscribeData):
         for instrument_id in self._instrument_provider.get_all():
             await self._subscribe_asset_book(instrument_id)
 
