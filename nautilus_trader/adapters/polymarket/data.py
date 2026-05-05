@@ -329,7 +329,16 @@ class PolymarketDataClient(LiveMarketDataClient):
 
     async def _subscribe(self, command: SubscribeData):
         for instrument_id in self._instrument_provider.get_all():
-            await self._subscribe_asset_book(instrument_id)
+            if command.instrument_id not in self._local_books:
+                self._create_local_book(instrument_id)
+
+            token_id = get_polymarket_token_id(instrument_id)
+
+            if self._ws_client.is_connected():
+                await self._ws_client.subscribe(token_id)
+            else:
+                self._ws_client.add_subscription(token_id)
+                self._schedule_delayed_connect()
 
     async def _subscribe_order_book_deltas(self, command: SubscribeOrderBook) -> None:
         if command.book_type == BookType.L3_MBO:
